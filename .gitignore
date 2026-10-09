@@ -1,0 +1,11 @@
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Downloaded app under test: fetched and checksum-verified by tools/fetch_apk.sh
+apps/
+
+# Test output: reports, screenshots, logcat
+reports/
+*.log
