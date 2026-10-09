@@ -6,6 +6,9 @@ import re
 from appium.webdriver.common.appiumby import AppiumBy
 from appium.webdriver.webdriver import WebDriver
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.webdriver.common.actions import interaction
+from selenium.webdriver.common.actions.action_builder import ActionBuilder
+from selenium.webdriver.common.actions.pointer_input import PointerInput
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -92,6 +95,27 @@ class BasePage:
         if found:
             return found[0]
         raise NoSuchElementException(f'no element with text "{value}" after scrolling to the end')
+
+    def drag(self, start: tuple[int, int], end: tuple[int, int], hold: float = 0) -> None:
+        """Touch at start, optionally hold (a long press), move to end, release.
+
+        Built from W3C Actions, the WebDriver standard for pointer input, so the same code works
+        with any Appium driver; `mobile:` gesture commands are specific to UiAutomator2.
+        """
+        actions = ActionBuilder(self.driver, mouse=PointerInput(interaction.POINTER_TOUCH, "finger"))
+        finger = actions.pointer_action
+        finger.move_to_location(*start)
+        finger.pointer_down()
+        if hold:
+            finger.pause(hold)
+        finger.move_to_location(*end)
+        finger.release()
+        actions.perform()
+
+    @staticmethod
+    def center(element: WebElement) -> tuple[int, int]:
+        x1, y1, x2, y2 = BasePage.bounds(element)
+        return (x1 + x2) // 2, (y1 + y2) // 2
 
     @staticmethod
     def bounds(element: WebElement) -> tuple[int, int, int, int]:

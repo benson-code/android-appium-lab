@@ -12,6 +12,8 @@ from appium.webdriver.common.appiumby import AppiumBy
 from framework.pages.base_page import BasePage, Locator, resource_id
 from framework.pages.controls_page import ControlsPage
 from framework.pages.dialogs_page import AlertDialogsPage
+from framework.pages.gesture_pages import DragAndDropPage, SeekBarPage
+from framework.pages.save_restore_page import SaveRestorePage
 
 ENTRY = resource_id("android:id/text1")
 
@@ -76,6 +78,18 @@ class HomePage(MenuPage):
     def open_alert_dialogs(self) -> AlertDialogsPage:
         self.open_path("App", "Alert Dialogs")
         return AlertDialogsPage(self.driver, self.timeout)
+
+    def open_seek_bar(self) -> SeekBarPage:
+        self.open_path("Views", "Seek Bar")
+        return SeekBarPage(self.driver, self.timeout)
+
+    def open_drag_and_drop(self) -> DragAndDropPage:
+        self.open_path("Views", "Drag and Drop")
+        return DragAndDropPage(self.driver, self.timeout)
+
+    def open_save_restore_state(self) -> SaveRestorePage:
+        self.open_path("App", "Activity", "Save & Restore State")
+        return SaveRestorePage(self.driver, self.timeout)
 
 
 class ViewsPage(MenuPage):
