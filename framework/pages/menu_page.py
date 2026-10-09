@@ -10,6 +10,8 @@ from __future__ import annotations
 from appium.webdriver.common.appiumby import AppiumBy
 
 from framework.pages.base_page import BasePage, Locator, resource_id
+from framework.pages.controls_page import ControlsPage
+from framework.pages.dialogs_page import AlertDialogsPage
 
 ENTRY = resource_id("android:id/text1")
 
@@ -34,6 +36,31 @@ class MenuPage(BasePage):
         """Scroll to an entry (it may be below the visible part of the list) and tap it."""
         self.scroll_to_text(entry).click()
 
+    def open_path(self, *entries: str) -> None:
+        """Open nested entries in turn, e.g. open_path("Views", "Controls")."""
+        for entry in entries:
+            self.open(entry)
+
+    def entries(self) -> list:
+        return self.find_all(ENTRY)
+
+    def scroll_to_end(self, max_swipes: int = 50) -> None:
+        """Scroll down until the list is at its end.
+
+        The scroll gesture can report that it cannot scroll further one swipe early, with the last
+        entry still almost entirely off screen (measured: 1 px visible). The end is reached only
+        when the gesture reports it AND the last entry stops moving.
+        """
+        previous = None
+        for _ in range(max_swipes):
+            can_scroll = self.scroll_down()
+            last = self.entries()[-1]
+            position = (last.text, self.bounds(last))
+            if not can_scroll and position == previous:
+                return
+            previous = position
+        raise AssertionError(f"the list did not end after {max_swipes} swipes")
+
 
 class HomePage(MenuPage):
     MARKERS = ("Content", "Graphics", "Media", "NFC", "OS", "Preference", "Text", "Views")
@@ -41,6 +68,14 @@ class HomePage(MenuPage):
     def open_views(self) -> ViewsPage:
         self.open("Views")
         return ViewsPage(self.driver, self.timeout)
+
+    def open_controls(self) -> ControlsPage:
+        self.open_path("Views", "Controls", "1. Light Theme")
+        return ControlsPage(self.driver, self.timeout)
+
+    def open_alert_dialogs(self) -> AlertDialogsPage:
+        self.open_path("App", "Alert Dialogs")
+        return AlertDialogsPage(self.driver, self.timeout)
 
 
 class ViewsPage(MenuPage):

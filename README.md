@@ -20,13 +20,17 @@ android-appium-lab/
 │   ├── driver.py              Appium session (UiAutomator2)
 │   ├── device.py              adb: preflight checks, app state, logcat
 │   └── pages/
-│       ├── base_page.py       Locator strategies, explicit waits, scrolling
-│       └── menu_page.py       ApiDemos list screens: home and sub-menus
+│       ├── base_page.py       Locator strategies, explicit waits, scrolling, on-screen bounds
+│       ├── menu_page.py       ApiDemos list screens: home and sub-menus
+│       ├── controls_page.py   Text field, checkbox, radio, toggle, spinner
+│       └── dialogs_page.py    Standard Android dialogs
 ├── testdata/                  (2) Test data layer
-│   └── environments.yaml      local (redroid) and ci (emulator)
+│   ├── environments.yaml      local (redroid) and ci (emulator)
+│   ├── cases.py               CSV loader; case_id, marks and is_run live in the data
+│   └── cases/text_input.csv   Text-input cases, one per row
 ├── tests/                     (3) Test case layer
 │   ├── conftest.py            Options, preflight, fixtures, case selection, failure evidence
-│   └── test_smoke.py
+│   └── test_*.py              smoke, navigation, input, dialog
 └── tools/
     ├── fetch_apk.sh           Pinned ApiDemos release, SHA-256 verified
     ├── setup_redroid.sh       Local Android 14 container: up / down / status
@@ -39,6 +43,11 @@ element is located lives in `framework/pages/`. When a screen changes, only its 
 
 **Locator strategies,** in order of preference: accessibility ID, resource ID, visible text. XPath is
 avoided because it is slow on Android and breaks when the layout changes.
+
+**Scrolling:** UiAutomator only sees what is on screen, so an entry further down a list must be
+scrolled into view before it can be found. The page objects scroll with the `mobile: scrollGesture`
+command, a large swipe at a time, instead of `UiScrollable.scrollIntoView`, which first scrolls back to
+the top and then moves in small steps (about 8 s against 1.5 s to reach an entry one screen down).
 
 **Every test starts from a known state:** the `home` fixture force-stops the app, launches it again,
 clears logcat and waits for the home screen. One Appium session is shared by the whole run, because
@@ -86,6 +95,16 @@ reachable from the network.
 |---|---|---|
 | SMK-001 | smoke | The app starts on the home menu, with its first entries in order |
 | SMK-002 | smoke | Open Views, press the system back button, return to the home menu |
+| NAV-001 | navigation | Open an entry that starts below the visible part of the list |
+| NAV-002 | navigation | Three levels deep: Views > Controls > 1. Light Theme opens its own activity |
+| NAV-003 | navigation | Scroll a long list to its end: the last entry is fully visible and the list scrolls no further |
+| INP-001–007 | input | Text field, from `testdata/cases/text_input.csv`: English, Traditional Chinese, emoji, markup and quote characters, empty, 200 characters, leading and trailing spaces; each must read back unchanged |
+| INP-010 | input | A checkbox checks and unchecks, without affecting the other one |
+| INP-011 | input | Radio buttons are mutually exclusive |
+| INP-012 | input | A toggle switches ON and OFF, in its label and its checked state |
+| INP-013 | input | A spinner (drop-down) shows the option selected |
+| DLG-001 | dialog | Cancel closes an OK/Cancel dialog and returns to the screen behind it |
+| DLG-002 | dialog | A list dialog offers its four options and reports the one chosen |
 
 ## Issues found during development
 
@@ -94,3 +113,7 @@ reachable from the network.
 | `tools/setup_redroid.sh down` followed immediately by `up` failed: the container name was still in use | Testing the script from a cold start | With `--rm`, `docker stop` returns before the container is removed. `down` now waits for removal, and `up` clears a stopped leftover first |
 | SMK-002 failed although the app behaved correctly | The failure evidence: the screenshot showed the home menu, scrolled down | Android restores a list's scroll position on back, so the top entry used to recognize the home screen was out of view. Screens are now recognized by any of several entries unique to them |
 | The `app` capability failed with "Could not find 'aapt2'" | First Appium session on the ARM64 machine | aapt2 has no ARM64 Linux build. The app is installed with adb, and the session names its package and activity |
+| An empty text field read back as "hint text" | Exploring the Controls screen before writing INP-005 | An empty EditText reports its hint as its text. The page object treats the field as empty when its text equals its `hint` attribute |
+| The suite took 4 minutes for 18 tests | `pytest --durations`: opening an entry one screen down took 8 s | `UiScrollable.scrollIntoView` scrolls back to the top first and then moves in small steps. Replaced with `mobile: scrollGesture`: 1.5 s. The suite now takes about 2 minutes 15 seconds |
+| A tap took 1.2 s | Timing UiAutomator's `waitForIdleTimeout` at 10 000, 1 000, 300 and 0 ms | 300 ms halves the time of a tap. 0 ms made element lookups fail, so it is not used: speed bought with flakiness is not a gain |
+| NAV-003 passed while the last entry was 1 px on screen | A second assertion (the list must not move after its end) failed consistently; the element bounds showed `[0,1183][720,1184]` | The scroll gesture can report the end one swipe early, and an element 1 px on screen is still found. The end is now reached only when the gesture reports it and the last entry stops moving, and NAV-003 requires the last entry to be as tall as a full row. Checked both ways: the old scrolling fails the new assertion (1 px against 96 px) |

@@ -18,4 +18,8 @@ def create_driver(env: Environment) -> webdriver.Remote:
     options.no_reset = True                  # the suite resets app state itself, per test
     options.new_command_timeout = 120
     options.set_capability("appium:disableWindowAnimation", True)   # animations make waits flaky
-    return webdriver.Remote(env.appium_url, options=options)
+    driver = webdriver.Remote(env.appium_url, options=options)
+    # After each action UiAutomator waits for the UI to be idle, up to 10 s by default. 300 ms halves
+    # the time of a tap on this app; 0 made element lookups fail intermittently. Measured, not guessed.
+    driver.update_settings({"waitForIdleTimeout": 300})
+    return driver

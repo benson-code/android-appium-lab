@@ -1,0 +1,9 @@
+case_id,marks,is_run,title,text,repeat
+INP-001,input,Y,English letters and spaces,hello appium,1
+INP-002,input,Y,Traditional Chinese,繁體中文輸入,1
+INP-003,input,Y,Emoji,付款成功 😀👍,1
+INP-004,input,Y,Markup and quote characters,"<&>'""%\",1
+INP-005,input|boundary,Y,Empty: the field must read back as empty and not as its hint,,1
+INP-006,input|boundary,Y,200 characters,x,200
+INP-007,input,Y,Leading and trailing spaces are kept,  spaced  ,1
+INP-X01,input,N,Example: rows with is_run=N are not collected,ignored,1
