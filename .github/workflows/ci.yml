@@ -47,9 +47,14 @@ jobs:
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 34
-          target: google_apis
+          # Automated Test Device: an AOSP image stripped of apps and services that tests do not use.
+          # The google_apis image ran Google services and Pixel Launcher, whose launcher repeatedly
+          # stopped responding on the runner and covered the screen (runs 37958235196, 37963060685).
+          target: aosp_atd
           arch: x86_64
           profile: pixel_6
+          cores: 3
+          ram-size: 4096M
           disable-animations: true
           script: tools/ci_run_tests.sh
 

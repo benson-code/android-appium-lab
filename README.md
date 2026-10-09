@@ -186,7 +186,8 @@ reachable from the network.
 1. Installs the Python requirements, Appium 3.8.0 and the UiAutomator2 driver 8.7.0 (pinned).
 2. Downloads ApiDemos and verifies its SHA-256 (`tools/fetch_apk.sh`).
 3. Gives the runner access to KVM and starts the Android emulator: API 34, x86_64, Pixel 6 profile,
-   animations off.
+   3 cores and 4 GB, animations off, on the `aosp_atd` (Automated Test Device) system image, which
+   leaves out apps and services that tests do not use.
 4. Runs `tools/ci_run_tests.sh`: installs the app, starts Appium, runs the smoke tests and stops if
    they fail, then runs the full suite with `--env=ci`.
 5. Uploads `reports/` whether the run passed or failed: the pytest-html report, JUnit XML, the
