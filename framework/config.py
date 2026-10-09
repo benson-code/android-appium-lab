@@ -17,6 +17,7 @@ class Environment:
     udid: str              # adb serial of the device
     app_package: str
     app_activity: str
+    app_label: str         # the name Android shows for the app
 
 
 def names() -> list[str]:
@@ -28,7 +29,7 @@ def load(name: str) -> Environment:
     env = data["environments"][name]
     return Environment(name=name, description=env["description"], appium_url=env["appium_url"],
                        udid=env["udid"], app_package=data["app"]["package"],
-                       app_activity=data["app"]["activity"])
+                       app_activity=data["app"]["activity"], app_label=data["app"]["label"])
 
 
 def _load() -> dict:

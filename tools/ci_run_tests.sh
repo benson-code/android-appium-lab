@@ -16,6 +16,10 @@ adb -s "$SERIAL" install -r apps/ApiDemos-debug.apk
 echo "Device: Android $(adb -s "$SERIAL" shell getprop ro.build.version.release | tr -d '\r')," \
      "$(adb -s "$SERIAL" shell getprop ro.product.cpu.abi | tr -d '\r'), $(adb -s "$SERIAL" shell wm size | tr -d '\r')"
 
+# Right after boot the emulator is still busy, and system apps can stop responding; close any
+# system dialog left over from boot (CI run 37958235196: "Pixel Launcher isn't responding").
+adb -s "$SERIAL" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS > /dev/null
+
 tools/appium_server.sh start
 
 status=0

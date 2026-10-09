@@ -2,6 +2,7 @@
 app:
   package: io.appium.android.apis
   activity: .ApiDemos
+  label: API Demos            # the name Android shows, e.g. in "<label> isn't responding"
 
 environments:
   local:

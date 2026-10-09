@@ -91,7 +91,8 @@ UiAutomator2.
 a background app, and `am start -W` to measure a cold start.
 
 **Every test starts from a known state:** the `home` fixture force-stops the app, launches it again,
-clears logcat and waits for the home screen. One Appium session is shared by the whole run, because
+clears logcat and waits for the home screen. If another app's "isn't responding" dialog covers the
+screen, it is dismissed first; one about the app under test never is. One Appium session is shared by the whole run, because
 creating a session takes several seconds.
 
 **Every test is checked for crashes:** a test that starts from the home screen ends with a check of
@@ -230,4 +231,5 @@ screen, because an element is "found" as soon as any part of it is visible.
 | LCY-002 failed its own precondition: the process was still alive after `am kill` | The precondition assertion, which exists so the test cannot pass without the process actually dying | Right after the app leaves the screen it is not yet a background process, and `am kill` silently does nothing. The kill is retried until the process is gone, instead of sleeping a fixed time |
 | NAV-001 failed on the CI emulator, on its precondition | First CI run: the emulator's 1080×2400 screen shows the whole home menu, so "Views" no longer started out of view. Without the precondition the test would have passed there without scrolling at all | The test now opens Visibility, about 40 entries down the Views menu, which is out of view on any phone-sized screen |
 | INP-001 failed in setup on the CI emulator, never locally | First CI run: the stack trace ended in looking for a scrollable list. No screenshot existed, because only failures in the test body saved evidence | After a tap opens a short sub-menu (Views > Controls, six entries, not scrollable), the slower emulator had not drawn it yet; scrolling found nothing to scroll and failed at once. It now waits for the entry when there is nothing left to scroll. Setup failures now save evidence too |
+| Both smoke tests failed in setup on one CI run, and passed on the run before | The setup failure evidence: the screenshot showed "Pixel Launcher isn't responding", a system dialog covering the screen; logcat named no crash of the app | Right after boot the emulator is still busy and its own launcher can stop responding. Before each test, an "isn't responding" dialog about another app is dismissed with Wait and logged; one about the app under test is left alone, so the crash check still fails the test. The CI run also closes system dialogs before starting |
 | NAV-003 passed while the last entry was 1 px on screen | A second assertion (the list must not move after its end) failed consistently; the element bounds showed `[0,1183][720,1184]` | The scroll gesture can report the end one swipe early, and an element 1 px on screen is still found. The end is now reached only when the gesture reports it and the last entry stops moving, and NAV-003 requires the last entry to be as tall as a full row. Checked both ways: the old scrolling fails the new assertion (1 px against 96 px) |

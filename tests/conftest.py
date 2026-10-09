@@ -19,6 +19,7 @@ from framework.device import AdbError, Device
 from framework.driver import create_driver
 from framework.logcat import find_problems
 from framework.pages.menu_page import HomePage
+from framework.pages.system_dialogs import dismiss_other_app_not_responding
 
 ROOT = Path(__file__).resolve().parent.parent
 EVIDENCE_DIR = ROOT / "reports" / "evidence"
@@ -104,14 +105,24 @@ def home(env, device, driver) -> HomePage:
     once after the whole run, names the test during which the app crashed."""
     device.clear_logcat()
     device.force_stop(env.app_package)
+    _dismiss_foreign_dialog(driver, env)
     driver.activate_app(env.app_package)
     page = HomePage(driver)
+    if not page.is_loaded() and _dismiss_foreign_dialog(driver, env):
+        driver.activate_app(env.app_package)
     assert page.is_loaded(), "the app did not open on its home screen"
     yield page
     problems = find_problems(device.logcat(), env.app_package)
     if problems:
         pytest.fail("STB-002: the app crashed or stopped responding during this test:\n"
                     + "\n".join(str(p) for p in problems), pytrace=False)
+
+
+def _dismiss_foreign_dialog(driver, env) -> bool:
+    title = dismiss_other_app_not_responding(driver, env.app_label)
+    if title:
+        print(f"dismissed a system dialog that was not about the app under test: {title!r}")
+    return title is not None
 
 
 # ---- evidence on failure ----------------------------------------------------------------
