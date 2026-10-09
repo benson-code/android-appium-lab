@@ -6,7 +6,7 @@
 > [ApiDemos](https://github.com/appium/android-apidemos), the demo app published by the Appium
 > project for automation practice.
 
-UI automation for an Android app with Appium and pytest. The same 25 tests run in two different
+UI automation for an Android app with Appium and pytest. The same 26 tests run in two different
 Android environments: Android 14 in a container on an ARM64 development machine, and the Android
 emulator (x86_64) in GitHub Actions on every push.
 
@@ -78,10 +78,16 @@ element is located lives in `framework/pages/`. When a screen changes, only its 
 **Locator strategies,** in order of preference: accessibility ID, resource ID, visible text. XPath is
 avoided because it is slow on Android and breaks when the layout changes.
 
-**Scrolling:** UiAutomator only sees what is on screen, so an entry further down a list must be
+**Scrolling:** UiAutomator only sees what is on screen, so an entry further along a list must be
 scrolled into view before it can be found. The page objects scroll with the `mobile: scrollGesture`
 command, a large swipe at a time, instead of `UiScrollable.scrollIntoView`, which first scrolls back
 to the top and then moves in small steps (about 8 s against 1.5 s to reach an entry one screen down).
+The search goes down to the end and then back up, because Android may restore a list in a scrolled
+position.
+
+**Screen transitions:** a tap returns before the next screen is drawn. After opening a menu entry,
+the page object waits until the tapped entry is gone (the screen has been replaced) and the next
+list is on screen, before looking for anything on it.
 
 **Gestures** are built from W3C Actions, the WebDriver standard for pointer input (touch down, pause,
 move, release), so they work with any Appium driver; `mobile:` gesture commands are specific to
@@ -106,7 +112,7 @@ the test started.
 
 ## 2. Test cases
 
-25 tests. Each must pass in both environments.
+26 tests. Each must pass in both environments.
 
 | ID | Mark | Case |
 |---|---|---|
@@ -115,6 +121,7 @@ the test started.
 | NAV-001 | navigation | Open an entry that starts below the visible part of a long list, on any phone-sized screen |
 | NAV-002 | navigation | Three levels deep: Views > Controls > 1. Light Theme opens its own activity |
 | NAV-003 | navigation | Scroll a long list to its end: the last entry is fully visible and the list scrolls no further |
+| NAV-004 | navigation | After scrolling a long list to its end, open its first entry: the search must scroll back up |
 | INP-001–007 | input | Text field, from `testdata/cases/text_input.csv`: English, Traditional Chinese, emoji, markup and quote characters, empty, 200 characters, leading and trailing spaces; each must read back unchanged |
 | INP-010 | input | A checkbox checks and unchecks, without affecting the other one |
 | INP-011 | input | Radio buttons are mutually exclusive |
@@ -143,7 +150,7 @@ pytest --target_case_ids=NAV-003,LCY-002
 
 The development machine is an ARM64 cloud VM without KVM, so the Android emulator cannot run on it.
 Android 14 runs in a Docker container instead ([redroid](https://github.com/remote-android/redroid-doc)),
-natively on ARM64. A full local run takes about 3 minutes 15 seconds.
+natively on ARM64. A full local run takes about 5 minutes.
 
 One-time setup:
 
@@ -232,4 +239,5 @@ screen, because an element is "found" as soon as any part of it is visible.
 | NAV-001 failed on the CI emulator, on its precondition | First CI run: the emulator's 1080×2400 screen shows the whole home menu, so "Views" no longer started out of view. Without the precondition the test would have passed there without scrolling at all | The test now opens Visibility, about 40 entries down the Views menu, which is out of view on any phone-sized screen |
 | INP-001 failed in setup on the CI emulator, never locally | First CI run: the stack trace ended in looking for a scrollable list. No screenshot existed, because only failures in the test body saved evidence | After a tap opens a short sub-menu (Views > Controls, six entries, not scrollable), the slower emulator had not drawn it yet; scrolling found nothing to scroll and failed at once. It now waits for the entry when there is nothing left to scroll. Setup failures now save evidence too |
 | Both smoke tests failed in setup on one CI run, and passed on the run before | The setup failure evidence: the screenshot showed "Pixel Launcher isn't responding", a system dialog covering the screen; logcat named no crash of the app | Right after boot the emulator is still busy and its own launcher can stop responding. Before each test, an "isn't responding" dialog about another app is dismissed with Wait and logged; one about the app under test is left alone, so the crash check still fails the test. The CI run also closes system dialogs before starting |
+| GES-002 and INP-003 could not find an entry near the top of Views on the CI emulator | CI run 37959357111: "no element with text ... after scrolling to the end" for entries that are on the first screen | The tap that opened Views returned before Views was drawn; the search looked at the old screen, then scrolled the new list as it appeared and pushed the target out of view above, and it only searched downwards. Opening an entry now waits for the screen to change and the next list to appear, and the search also scrolls back up. NAV-004 covers the upward search and fails against the old scrolling. Waiting for each transition (about 0.7 s) made the local run about a minute longer: the earlier speed came partly from not waiting, which only worked on the faster device |
 | NAV-003 passed while the last entry was 1 px on screen | A second assertion (the list must not move after its end) failed consistently; the element bounds showed `[0,1183][720,1184]` | The scroll gesture can report the end one swipe early, and an element 1 px on screen is still found. The end is now reached only when the gesture reports it and the last entry stops moving, and NAV-003 requires the last entry to be as tall as a full row. Checked both ways: the old scrolling fails the new assertion (1 px against 96 px) |

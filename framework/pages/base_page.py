@@ -67,41 +67,50 @@ class BasePage:
         except TimeoutException:
             return False
 
-    def scroll_down(self) -> bool:
-        """Scroll the first scrollable container down by most of its height.
+    def scroll(self, direction: str = "down") -> bool:
+        """Scroll the first scrollable container by most of its height, "down" or "up".
 
-        Returns whether it can scroll further: False means the end of the list has been reached.
+        Returns whether it can scroll further that way: False means that end of the list is reached.
         """
         areas = self.driver.find_elements(AppiumBy.ANDROID_UIAUTOMATOR, "new UiSelector().scrollable(true)")
         if not areas:
             # Nothing to scroll: a short list that fits on screen, or a screen still appearing.
             return False
         return bool(self.driver.execute_script(
-            "mobile: scrollGesture", {"elementId": areas[0].id, "direction": "down", "percent": 0.75}))
+            "mobile: scrollGesture", {"elementId": areas[0].id, "direction": direction, "percent": 0.75}))
 
-    def scroll_to_text(self, value: str, max_swipes: int = 15) -> WebElement:
-        """Scroll down until an element with this text is on screen, and return it.
+    def scroll_down(self) -> bool:
+        return self.scroll("down")
 
-        UiAutomator only sees what is on screen: an element further down a list cannot be found
+    def scroll_to_text(self, value: str, max_swipes: int = 15, settle: float = 0) -> WebElement:
+        """Find an element with this text, scrolling if it is not on screen, and return it.
+
+        UiAutomator only sees what is on screen: an element further along a list cannot be found
         until it has been scrolled into view. UiScrollable.scrollIntoView does this too, but it
         first scrolls back to the top and then moves in small steps, waiting for the UI to settle
         after each one: about 8 s to reach an entry one screen down, against about 1.5 s here.
+
+        A list can start scrolled (Android restores a list's scroll position on back), so the target
+        may be above: search down to the end, then up to the top. `settle` gives the target time to
+        appear before any scrolling; callers that know when their screen is drawn (MenuPage.open)
+        wait for that instead, which costs nothing when the target is off screen.
         """
         locator = text(value)
-        for _ in range(max_swipes):
-            found = self.driver.find_elements(*locator)
-            if found:
-                return found[0]
-            if not self.scroll_down():
-                break
-        # Nothing more to scroll. The element may be on a screen that is still appearing (the tap that
-        # opened it has returned, the new screen has not been drawn yet), so wait for it before failing.
-        # Found on the CI emulator: Views > Controls had not appeared yet, and a short list that fits on
-        # screen is not scrollable at all, so failing at once broke INP-001 there but never locally.
+        if settle and self.is_present(locator, timeout=settle):
+            return self.driver.find_elements(*locator)[0]
+        for direction in ("down", "up"):
+            for _ in range(max_swipes):
+                found = self.driver.find_elements(*locator)
+                if found:
+                    return found[0]
+                if not self.scroll(direction):
+                    break
+        # Nothing more to scroll either way. The element may be on a screen that is still appearing,
+        # and a short list that fits on screen is not scrollable at all, so wait before failing.
         try:
             return WebDriverWait(self.driver, self.timeout).until(EC.presence_of_element_located(locator))
         except TimeoutException:
-            raise NoSuchElementException(f'no element with text "{value}" after scrolling to the end') from None
+            raise NoSuchElementException(f'no element with text "{value}" after scrolling both ways') from None
 
     def drag(self, start: tuple[int, int], end: tuple[int, int], hold: float = 0) -> None:
         """Touch at start, optionally hold (a long press), move to end, release.

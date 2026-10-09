@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from appium.webdriver.common.appiumby import AppiumBy
 
-from framework.pages.base_page import BasePage, Locator, resource_id
+from framework.pages.base_page import BasePage, Locator, resource_id, text
 from framework.pages.controls_page import ControlsPage
 from framework.pages.dialogs_page import AlertDialogsPage
 from framework.pages.gesture_pages import DragAndDropPage, SeekBarPage
@@ -35,8 +35,19 @@ class MenuPage(BasePage):
         return [e.text for e in self.find_all(ENTRY)]
 
     def open(self, entry: str) -> None:
-        """Scroll to an entry (it may be below the visible part of the list) and tap it."""
+        """Scroll to an entry (it may be out of view) and tap it, then wait for the next screen.
+
+        Found on the CI emulator, which is slower than the local device: a tap returns before the
+        next screen is drawn. Looking for the next entry at once searched the old screen, and
+        scrolling then acted on the new list as it appeared, moving the target out of view. So:
+        wait for this menu's list before searching it, and after the tap wait until the tapped
+        entry is gone, which means this screen has been replaced. (Waiting for the tapped element
+        to go stale took over 11 s; checking that its text is gone takes a fraction of a second.)
+        """
+        self.find(ENTRY)
         self.scroll_to_text(entry).click()
+        if not self.is_gone(text(entry)):
+            raise AssertionError(f'the screen did not change after tapping "{entry}"')
 
     def open_path(self, *entries: str) -> None:
         """Open nested entries in turn, e.g. open_path("Views", "Controls")."""

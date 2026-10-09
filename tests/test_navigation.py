@@ -1,7 +1,7 @@
 """NAV. Moving between screens. UiAutomator only sees what is on screen, so scrolling is part of navigation."""
 import pytest
 
-from framework.pages.base_page import resource_id
+from framework.pages.base_page import accessibility_id, resource_id
 from framework.pages.controls_page import ControlsPage
 
 pytestmark = pytest.mark.navigation
@@ -47,3 +47,16 @@ def test_scroll_a_long_list_to_its_end(home):
     # always match, because bounds are read live
     assert views.scroll_down() is False, "the list still scrolls after reaching its end"
     assert views.bounds(views.entries()[-1]) == end_position, "the list moved after reaching its end"
+
+
+@pytest.mark.case_id("NAV-004")
+def test_open_an_entry_above_the_visible_list(home):
+    """After scrolling a long list to its end, its first entry is above the screen: opening it
+    requires scrolling back up. (Scrolling only searched downwards at first; a list that Android
+    restores in a scrolled position would have hidden its first entries.)"""
+    views = home.open_views()
+    views.scroll_to_end()
+    assert "Animation" not in views.visible_entries(), "precondition: Animation is out of view above"
+    views.open("Animation")
+    assert views.is_present(accessibility_id("Interpolators"), timeout=10), "Views > Animation did not open"
+
