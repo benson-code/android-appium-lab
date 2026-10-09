@@ -18,7 +18,8 @@ android-appium-lab/
 ├── framework/                 (1) Driver and page-object layer
 │   ├── config.py              Environments from testdata/environments.yaml
 │   ├── driver.py              Appium session (UiAutomator2)
-│   ├── device.py              adb: preflight, process control, launch timing, logcat
+│   ├── device.py              adb: preflight, process control, launch timing, logcat, monkey
+│   ├── logcat.py              Finds the app's crashes, native crashes and ANRs in logcat
 │   └── pages/
 │       ├── base_page.py       Locator strategies, explicit waits, scrolling, on-screen bounds
 │       ├── menu_page.py       ApiDemos list screens: home and sub-menus
@@ -32,11 +33,12 @@ android-appium-lab/
 │   └── cases/text_input.csv   Text-input cases, one per row
 ├── tests/                     (3) Test case layer
 │   ├── conftest.py            Options, preflight, fixtures, case selection, failure evidence
-│   └── test_*.py              smoke, navigation, input, dialog, gesture, lifecycle
+│   └── test_*.py              smoke, navigation, input, dialog, gesture, lifecycle, stability
 └── tools/
     ├── fetch_apk.sh           Pinned ApiDemos release, SHA-256 verified
     ├── setup_redroid.sh       Local Android 14 container: up / down / status
     ├── appium_server.sh       Local Appium server on 127.0.0.1: start / stop / status
+    ├── logcat_check.py        Crash/ANR check for a saved logcat file (exit 1 if found)
     └── make_minimal_sdk.sh    Minimal ANDROID_HOME for ARM64 Linux
 ```
 
@@ -61,6 +63,11 @@ background app, and `am start -W` to measure a cold start.
 **Every test starts from a known state:** the `home` fixture force-stops the app, launches it again,
 clears logcat and waits for the home screen. One Appium session is shared by the whole run, because
 creating a session takes several seconds.
+
+**Every test is checked for crashes:** a test that starts from the home screen ends with a logcat check.
+If the app crashed (Java or native) or stopped responding (ANR) during the test, the test fails even
+when its own assertions passed, and the failure names the test during which it happened. Only the
+app under test counts: a crash of another app on the device is ignored.
 
 **Every failed test leaves evidence** in `reports/evidence/<test>/`: a screenshot, the UI hierarchy
 (`page_source.xml`) and logcat since the test started.
@@ -119,6 +126,9 @@ reachable from the network.
 | LCY-001 | lifecycle | 5 s in the background: the same process returns on the same screen |
 | LCY-002 | lifecycle | The process is killed in the background: the activity is recreated, the field with a view ID gets its text back, the field without an ID does not |
 | LCY-003 | lifecycle | Cold start: `am start -W` reports a COLD launch under 5 s (measured about 700 ms) and the home menu opens |
+| STB-001 | stability | The Android monkey sends 500 random events (fixed seed, system keys excluded): no crash or ANR. `MONKEY_SEED=<n>` reproduces a run |
+| STB-002 | stability | Applied to every test that starts from the home screen: no crash or ANR of the app in the test's logcat |
+| STB-003 | stability | The crash check can fail: crash and ANR lines written to the device's logcat in Android's format are found, with the stack trace; another app's crash is not attributed to this app |
 
 ## Issues found during development
 
@@ -130,6 +140,7 @@ reachable from the network.
 | An empty text field read back as "hint text" | Exploring the Controls screen before writing INP-005 | An empty EditText reports its hint as its text. The page object treats the field as empty when its text equals its `hint` attribute |
 | The suite took 4 minutes for 18 tests | `pytest --durations`: opening an entry one screen down took 8 s | `UiScrollable.scrollIntoView` scrolls back to the top first and then moves in small steps. Replaced with `mobile: scrollGesture`: 1.5 s. The suite now takes about 2 minutes 15 seconds |
 | A tap took 1.2 s | Timing UiAutomator's `waitForIdleTimeout` at 10 000, 1 000, 300 and 0 ms | 300 ms halves the time of a tap. 0 ms made element lookups fail, so it is not used: speed bought with flakiness is not a gain |
+| The crash detector attached another app's crash to the app's stack trace | Running `tools/logcat_check.py` on a sample log with two crashes in a row | Stack-trace lines are now collected only up to the next crash report |
 | "Don't keep activities" did not take effect | LCY-002 draft: the field without a view ID kept its text, which is only possible if the activity was never destroyed; `dumpsys activity` confirmed the activity record was still alive | `settings put global always_finish_activities 1` alone does not apply the developer option. LCY-002 kills the background process with `am kill` instead, which is also closer to what users experience |
 | LCY-002 failed its own precondition: the process was still alive after `am kill` | The precondition assertion, which exists so the test cannot pass without the process actually dying | Right after the app leaves the screen it is not yet a background process, and `am kill` silently does nothing. The kill is retried until the process is gone, instead of sleeping a fixed time |
 | NAV-003 passed while the last entry was 1 px on screen | A second assertion (the list must not move after its end) failed consistently; the element bounds showed `[0,1183][720,1184]` | The scroll gesture can report the end one swipe early, and an element 1 px on screen is still found. The end is now reached only when the gesture reports it and the last entry stops moving, and NAV-003 requires the last entry to be as tall as a full row. Checked both ways: the old scrolling fails the new assertion (1 px against 96 px) |

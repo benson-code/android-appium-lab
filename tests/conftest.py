@@ -17,6 +17,7 @@ import pytest
 from framework import config
 from framework.device import AdbError, Device
 from framework.driver import create_driver
+from framework.logcat import find_problems
 from framework.pages.menu_page import HomePage
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -97,13 +98,20 @@ def driver(env):
 
 @pytest.fixture
 def home(env, device, driver) -> HomePage:
-    """Every test starts from a freshly launched app on its home screen, with an empty logcat."""
+    """Every test starts from a freshly launched app on its home screen, with an empty logcat,
+    and ends with a logcat check (STB-002): if the app crashed or stopped responding (ANR) during
+    the test, the test fails, even when its own assertions passed. Checking per test, rather than
+    once after the whole run, names the test during which the app crashed."""
     device.clear_logcat()
     device.force_stop(env.app_package)
     driver.activate_app(env.app_package)
     page = HomePage(driver)
     assert page.is_loaded(), "the app did not open on its home screen"
-    return page
+    yield page
+    problems = find_problems(device.logcat(), env.app_package)
+    if problems:
+        pytest.fail("STB-002: the app crashed or stopped responding during this test:\n"
+                    + "\n".join(str(p) for p in problems), pytrace=False)
 
 
 # ---- evidence on failure ----------------------------------------------------------------

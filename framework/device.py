@@ -1,6 +1,7 @@
 """adb access to the device, for what Appium does not cover: preflight checks, app state, logcat."""
 from __future__ import annotations
 
+import shlex
 import subprocess
 import time
 
@@ -81,3 +82,22 @@ class Device:
     def logcat(self) -> str:
         """Everything logged since the last clear_logcat(), with timestamps, process and thread IDs."""
         return self.adb("logcat", "-d", "-v", "threadtime")
+
+    def write_log(self, priority: str, tag: str, message: str) -> None:
+        """Write one line to logcat, as an app would (priority: V, D, I, W, E, F)."""
+        self.shell("log", "-p", priority.lower(), "-t", tag, shlex.quote(message))
+
+    # ---- monkey -------------------------------------------------------------------------
+
+    def run_monkey(self, package: str, events: int, seed: int, throttle_ms: int = 100) -> tuple[int, str]:
+        """Send random UI events to one app with the Android monkey; return (exit status, output).
+
+        The same seed replays the same event sequence, so a failure can be reproduced.
+        System keys (HOME, volume, power...) are excluded: they would leave the app or change the
+        device rather than exercise the app.
+        """
+        cmd = ["adb", "-s", self.serial, "shell", "monkey", "-p", package, "-s", str(seed),
+               "--throttle", str(throttle_ms), "--pct-syskeys", "0", "-v", str(events)]
+        result = subprocess.run(cmd, capture_output=True, text=True,
+                                timeout=events * throttle_ms / 1000 * 3 + 120)
+        return result.returncode, result.stdout + result.stderr
