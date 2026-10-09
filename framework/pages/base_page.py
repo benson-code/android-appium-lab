@@ -72,9 +72,12 @@ class BasePage:
 
         Returns whether it can scroll further: False means the end of the list has been reached.
         """
-        area = self.driver.find_element(AppiumBy.ANDROID_UIAUTOMATOR, "new UiSelector().scrollable(true)")
+        areas = self.driver.find_elements(AppiumBy.ANDROID_UIAUTOMATOR, "new UiSelector().scrollable(true)")
+        if not areas:
+            # Nothing to scroll: a short list that fits on screen, or a screen still appearing.
+            return False
         return bool(self.driver.execute_script(
-            "mobile: scrollGesture", {"elementId": area.id, "direction": "down", "percent": 0.75}))
+            "mobile: scrollGesture", {"elementId": areas[0].id, "direction": "down", "percent": 0.75}))
 
     def scroll_to_text(self, value: str, max_swipes: int = 15) -> WebElement:
         """Scroll down until an element with this text is on screen, and return it.
@@ -91,10 +94,14 @@ class BasePage:
                 return found[0]
             if not self.scroll_down():
                 break
-        found = self.driver.find_elements(*locator)
-        if found:
-            return found[0]
-        raise NoSuchElementException(f'no element with text "{value}" after scrolling to the end')
+        # Nothing more to scroll. The element may be on a screen that is still appearing (the tap that
+        # opened it has returned, the new screen has not been drawn yet), so wait for it before failing.
+        # Found on the CI emulator: Views > Controls had not appeared yet, and a short list that fits on
+        # screen is not scrollable at all, so failing at once broke INP-001 there but never locally.
+        try:
+            return WebDriverWait(self.driver, self.timeout).until(EC.presence_of_element_located(locator))
+        except TimeoutException:
+            raise NoSuchElementException(f'no element with text "{value}" after scrolling to the end') from None
 
     def drag(self, start: tuple[int, int], end: tuple[int, int], hold: float = 0) -> None:
         """Touch at start, optionally hold (a long press), move to end, release.

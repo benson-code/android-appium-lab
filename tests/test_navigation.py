@@ -1,6 +1,7 @@
 """NAV. Moving between screens. UiAutomator only sees what is on screen, so scrolling is part of navigation."""
 import pytest
 
+from framework.pages.base_page import resource_id
 from framework.pages.controls_page import ControlsPage
 
 pytestmark = pytest.mark.navigation
@@ -8,10 +9,14 @@ pytestmark = pytest.mark.navigation
 
 @pytest.mark.case_id("NAV-001")
 def test_open_an_entry_below_the_visible_list(home):
-    """Views is below the first screenful of the home menu: it can only be opened after scrolling."""
-    assert "Views" not in home.visible_entries(), "precondition: Views starts out of view"
+    """Visibility is near the end of the Views menu (about 40 entries), below the first screenful on
+    any phone-sized screen: it can only be opened after scrolling. (Views on the home menu was used
+    first, but the CI emulator's taller screen shows the whole home menu; the precondition caught it.)"""
     views = home.open_views()
-    assert views.is_loaded()
+    assert "Visibility" not in views.visible_entries(), "precondition: Visibility starts out of view"
+    views.open("Visibility")
+    assert views.is_present(resource_id("io.appium.android.apis:id/victim"), timeout=10), \
+        "the Visibility screen did not open"
 
 
 @pytest.mark.case_id("NAV-002")

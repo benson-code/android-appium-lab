@@ -118,10 +118,12 @@ def home(env, device, driver) -> HomePage:
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """When a test fails, save what was on screen: screenshot, UI hierarchy and logcat."""
+    """When a test or its setup fails, save what was on screen: screenshot, UI hierarchy and logcat."""
     outcome = yield
     report = outcome.get_result()
-    if report.when != "call" or not report.failed:
+    # Setup failures too: a fixture that cannot reach its screen is often the most informative case
+    # (INP-001 failed in setup on the CI emulator and left no screenshot before this).
+    if report.when not in ("setup", "call") or not report.failed:
         return
     driver, device = item.funcargs.get("driver"), item.funcargs.get("device")
     if driver is None:

@@ -99,8 +99,9 @@ its own logcat. If the app crashed (Java or native) or stopped responding (ANR) 
 test fails even when its own assertions passed, and the failure names the test during which it
 happened. Only the app under test counts: a crash of another app on the device is ignored.
 
-**Every failed test leaves evidence** in `reports/evidence/<test>/`: a screenshot, the UI hierarchy
-(`page_source.xml`) and logcat since the test started.
+**Every failed test leaves evidence,** including a failure in a fixture before the test body runs,
+in `reports/evidence/<test>/`: a screenshot, the UI hierarchy (`page_source.xml`) and logcat since
+the test started.
 
 ## 2. Test cases
 
@@ -110,7 +111,7 @@ happened. Only the app under test counts: a crash of another app on the device i
 |---|---|---|
 | SMK-001 | smoke | The app starts on the home menu, with its first entries in order |
 | SMK-002 | smoke | Open Views, press the system back button, return to the home menu |
-| NAV-001 | navigation | Open an entry that starts below the visible part of the list |
+| NAV-001 | navigation | Open an entry that starts below the visible part of a long list, on any phone-sized screen |
 | NAV-002 | navigation | Three levels deep: Views > Controls > 1. Light Theme opens its own activity |
 | NAV-003 | navigation | Scroll a long list to its end: the last entry is fully visible and the list scrolls no further |
 | INP-001–007 | input | Text field, from `testdata/cases/text_input.csv`: English, Traditional Chinese, emoji, markup and quote characters, empty, 200 characters, leading and trailing spaces; each must read back unchanged |
@@ -227,4 +228,6 @@ screen, because an element is "found" as soon as any part of it is visible.
 | The crash detector attached another app's crash to the app's stack trace | Running `tools/logcat_check.py` on a sample log with two crashes in a row | Stack-trace lines are now collected only up to the next crash report |
 | "Don't keep activities" did not take effect | LCY-002 draft: the field without a view ID kept its text, which is only possible if the activity was never destroyed; `dumpsys activity` confirmed the activity record was still alive | `settings put global always_finish_activities 1` alone does not apply the developer option. LCY-002 kills the background process with `am kill` instead, which is also closer to what users experience |
 | LCY-002 failed its own precondition: the process was still alive after `am kill` | The precondition assertion, which exists so the test cannot pass without the process actually dying | Right after the app leaves the screen it is not yet a background process, and `am kill` silently does nothing. The kill is retried until the process is gone, instead of sleeping a fixed time |
+| NAV-001 failed on the CI emulator, on its precondition | First CI run: the emulator's 1080×2400 screen shows the whole home menu, so "Views" no longer started out of view. Without the precondition the test would have passed there without scrolling at all | The test now opens Visibility, about 40 entries down the Views menu, which is out of view on any phone-sized screen |
+| INP-001 failed in setup on the CI emulator, never locally | First CI run: the stack trace ended in looking for a scrollable list. No screenshot existed, because only failures in the test body saved evidence | After a tap opens a short sub-menu (Views > Controls, six entries, not scrollable), the slower emulator had not drawn it yet; scrolling found nothing to scroll and failed at once. It now waits for the entry when there is nothing left to scroll. Setup failures now save evidence too |
 | NAV-003 passed while the last entry was 1 px on screen | A second assertion (the list must not move after its end) failed consistently; the element bounds showed `[0,1183][720,1184]` | The scroll gesture can report the end one swipe early, and an element 1 px on screen is still found. The end is now reached only when the gesture reports it and the last entry stops moving, and NAV-003 requires the last entry to be as tall as a full row. Checked both ways: the old scrolling fails the new assertion (1 px against 96 px) |
