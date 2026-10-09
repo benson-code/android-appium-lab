@@ -1,0 +1,14 @@
+# Where the tests run. Select one with: pytest --env=<name>
+app:
+  package: io.appium.android.apis
+  activity: .ApiDemos
+
+environments:
+  local:
+    description: Android 14 in a container (redroid) on the ARM64 development machine
+    appium_url: http://127.0.0.1:4723
+    udid: 127.0.0.1:5555
+  ci:
+    description: Android emulator (API 34, x86_64) on a GitHub-hosted runner
+    appium_url: http://127.0.0.1:4723
+    udid: emulator-5554
